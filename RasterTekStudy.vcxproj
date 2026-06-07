@@ -124,6 +124,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="applicationclass.h" />
+    <ClInclude Include="D3DClass.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="inputclass.h" />
     <ClInclude Include="RasterTekStudy.h" />
@@ -133,6 +134,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="applicationclass.cpp" />
+    <ClCompile Include="D3DClass.cpp" />
     <ClCompile Include="inputclass.cpp" />
     <ClCompile Include="RasterTekStudy.cpp" />
     <ClCompile Include="systemclass.cpp" />
