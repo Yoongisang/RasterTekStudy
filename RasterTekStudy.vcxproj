@@ -124,9 +124,12 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="applicationclass.h" />
+    <ClInclude Include="cameraclass.h" />
+    <ClInclude Include="colorshaderclass.h" />
     <ClInclude Include="D3DClass.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="inputclass.h" />
+    <ClInclude Include="modelclass.h" />
     <ClInclude Include="RasterTekStudy.h" />
     <ClInclude Include="Resource.h" />
     <ClInclude Include="systemclass.h" />
@@ -134,8 +137,11 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="applicationclass.cpp" />
+    <ClCompile Include="cameraclass.cpp" />
+    <ClCompile Include="colorshaderclass.cpp" />
     <ClCompile Include="D3DClass.cpp" />
     <ClCompile Include="inputclass.cpp" />
+    <ClCompile Include="modelclass.cpp" />
     <ClCompile Include="RasterTekStudy.cpp" />
     <ClCompile Include="systemclass.cpp" />
   </ItemGroup>
@@ -145,6 +151,16 @@
   <ItemGroup>
     <Image Include="RasterTekStudy.ico" />
     <Image Include="small.ico" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="color.vs">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="color.ps">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
