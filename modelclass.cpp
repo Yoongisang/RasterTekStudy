@@ -4,6 +4,7 @@ ModelClass::ModelClass()
 {
     m_vertexBuffer = 0;
     m_indexBuffer = 0;
+    m_Texture = 0;
 }
 
 ModelClass::ModelClass(const ModelClass& other)
@@ -14,7 +15,7 @@ ModelClass::~ModelClass()
 {
 }
 
-bool ModelClass::Initialize(ID3D11Device* device)
+bool ModelClass::Initialize(ID3D11Device* device, ID3D11DeviceContext* deviceContext, char* textureFilename)
 {
     bool result;
     
@@ -24,16 +25,30 @@ bool ModelClass::Initialize(ID3D11Device* device)
     {
         return false;
     }
+    
+    // 텍스처 초기화
+    result = LoadTexture(
+        device,
+        deviceContext,
+        textureFilename
+    );
 
+    if (!result)
+    {
+        ShutdownBuffers();
+        return false;
+    }
+    
     return true;
 }
 
 void ModelClass::Shutdown()
 {
+    // model texture를 해제
+    ReleaseTexture();
+
     // 정점 인덱스 버퍼를 종료
     ShutdownBuffers();
-
-    return;
 }
 
 void ModelClass::Render(ID3D11DeviceContext* deviceContext)
@@ -47,6 +62,11 @@ void ModelClass::Render(ID3D11DeviceContext* deviceContext)
 int ModelClass::GetIndexCount()
 {
     return m_indexCount;
+}
+
+ID3D11ShaderResourceView* ModelClass::GetTexture()
+{
+    return m_Texture->GetTexture();
 }
 
 bool ModelClass::InitializeBuffers(ID3D11Device* device)
@@ -76,13 +96,13 @@ bool ModelClass::InitializeBuffers(ID3D11Device* device)
 
     // 정점 배열에 데이터를 채움
     vertices[0].position = XMFLOAT3(-1.0f, -1.0f, 0.0f);  // 왼쪽 아래
-    vertices[0].color = XMFLOAT4(0.0f, 1.0f, 0.0f, 1.0f);
+    vertices[0].texture = XMFLOAT2(0.0f, 1.0f);
 
     vertices[1].position = XMFLOAT3(0.0f, 1.0f, 0.0f);  // 위쪽 가운데
-    vertices[1].color = XMFLOAT4(0.0f, 1.0f, 0.0f, 1.0f);
+    vertices[1].texture = XMFLOAT2(0.5f, 0.0f);
 
     vertices[2].position = XMFLOAT3(1.0f, -1.0f, 0.0f);  // 오른쪽 아래
-    vertices[2].color = XMFLOAT4(0.0f, 1.0f, 0.0f, 1.0f);
+    vertices[2].texture = XMFLOAT2(1.0f, 1.0f);
     // 인덱스 배열에 데이터를 채움
     indices[0] = 0;  // 왼쪽 아래
     indices[1] = 1;  // 위쪽 가운데
@@ -137,6 +157,34 @@ bool ModelClass::InitializeBuffers(ID3D11Device* device)
     return true;
 }
 
+bool ModelClass::LoadTexture(ID3D11Device* device, ID3D11DeviceContext* deviceContext, char* textureFilename)
+{
+    bool result;
+
+
+    // 텍스처 객체를 생성하고 초기화한다.
+    m_Texture = new TextureClass;
+
+    result = m_Texture->Initialize(device, deviceContext, textureFilename);
+    if (!result)
+    {
+        return false;
+    }
+
+    return true;
+}
+
+void ModelClass::ReleaseTexture()
+{
+    // 텍스처 객체를 해제.
+    if(m_Texture)
+    {
+        m_Texture->Shutdown();
+        delete m_Texture;
+        m_Texture = 0;
+    }
+}
+
 void ModelClass::ShutdownBuffers()
 {
     // 인덱스 버퍼를 해제
@@ -152,8 +200,6 @@ void ModelClass::ShutdownBuffers()
         m_vertexBuffer->Release();
         m_vertexBuffer = 0;
     }
-
-    return;
 }
 
 void ModelClass::RenderBuffers(ID3D11DeviceContext* deviceContext)
