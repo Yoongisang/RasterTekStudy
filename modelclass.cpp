@@ -97,12 +97,16 @@ bool ModelClass::InitializeBuffers(ID3D11Device* device)
     // 정점 배열에 데이터를 채움
     vertices[0].position = XMFLOAT3(-1.0f, -1.0f, 0.0f);  // 왼쪽 아래
     vertices[0].texture = XMFLOAT2(0.0f, 1.0f);
+    vertices[0].normal = XMFLOAT3(0.0f, 0.0f, -1.0f);
 
     vertices[1].position = XMFLOAT3(0.0f, 1.0f, 0.0f);  // 위쪽 가운데
     vertices[1].texture = XMFLOAT2(0.5f, 0.0f);
+    vertices[1].normal = XMFLOAT3(0.0f, 0.0f, -1.0f);
 
     vertices[2].position = XMFLOAT3(1.0f, -1.0f, 0.0f);  // 오른쪽 아래
     vertices[2].texture = XMFLOAT2(1.0f, 1.0f);
+    vertices[2].normal = XMFLOAT3(0.0f, 0.0f, -1.0f);
+
     // 인덱스 배열에 데이터를 채움
     indices[0] = 0;  // 왼쪽 아래
     indices[1] = 1;  // 위쪽 가운데

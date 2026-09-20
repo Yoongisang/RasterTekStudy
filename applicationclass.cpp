@@ -5,7 +5,8 @@ ApplicationClass::ApplicationClass()
 	m_Direct3D = 0;
 	m_Camera = 0;
 	m_Model = 0;
-	m_TextureShader = 0;
+	m_LightShader = 0;
+	m_Light = 0;
 }
 
 ApplicationClass::ApplicationClass(const ApplicationClass& other)
@@ -55,26 +56,35 @@ bool ApplicationClass::Initialize(int screenWidth, int screenHeight, HWND hwnd)
 		return false;
 	}
 	
-	m_TextureShader = new TextureShaderClass;
+	m_LightShader = new LightShaderClass;
 
-	result = m_TextureShader->Initialize(m_Direct3D->GetDevice(), hwnd);
+	result = m_LightShader->Initialize(m_Direct3D->GetDevice(), hwnd);
 	if(!result)
 	{
-		MessageBox(hwnd, L"Could not initialize the texture shader object.", L"Error", MB_OK);
+		MessageBox(hwnd, L"Could not initialize the light shader object.", L"Error", MB_OK);
 		return false;
 	}
 	
-	return result;
+	m_Light = new LightClass;
+	m_Light->SetDiffuseColor(1.0f, 1.0f, 1.0f, 1.0f);
+	m_Light->SetDirection(0.0f, 0.0f, 1.0f);
+	return true;
 }
 
 void ApplicationClass::Shutdown()
 {
-	// 컬러 셰이더 객체를 해제.
-	if (m_TextureShader)
+	if (m_Light)
 	{
-		m_TextureShader->Shutdown();
-		delete m_TextureShader;
-		m_TextureShader = 0;
+		delete m_Light;
+		m_Light = 0;
+	}
+
+	// 조명 셰이더 객체를 해제.
+	if (m_LightShader)
+	{
+		m_LightShader->Shutdown();
+		delete m_LightShader;
+		m_LightShader = 0;
 	}
 
 
@@ -107,18 +117,24 @@ bool ApplicationClass::Frame()
 {
 	bool result;
 	// 그래픽 장면 렌더링
-	result = Render();
+	static float rotation = 0.0f;
+	rotation += 0.01f;
+	if (rotation >= XM_2PI)
+	{
+		rotation -= XM_2PI;
+	}
+	result = Render(rotation);
 
 	return result; // 기존 튜토리얼에서 불필요한 코드 제거
 }
 
-bool ApplicationClass::Render()
+bool ApplicationClass::Render(float rotation)
 {
 	XMMATRIX worldMatrix, viewMatrix, projectionMatrix;
 	bool result;
 	
 	// 장면을 시작하기 위해 버퍼를 지움
-	m_Direct3D->BeginScene(0.5f, 0.5f, 0.5f, 1.0f);
+	m_Direct3D->BeginScene(0.0f, 0.0f, 0.0f, 1.0f);
 	
 	// 카메라의 위치를 바탕으로 뷰 행렬을 생성.
 	m_Camera->Render();
@@ -127,12 +143,13 @@ bool ApplicationClass::Render()
 	m_Direct3D->GetWorldMatrix(worldMatrix);
 	m_Camera->GetViewMatrix(viewMatrix);
 	m_Direct3D->GetProjectionMatrix(projectionMatrix);
+	worldMatrix = XMMatrixRotationY(rotation);
 
 	// 그리기를 준비하기 위해 모델의 정점·인덱스 버퍼를 그래픽 파이프라인에 올림.
 	m_Model->Render(m_Direct3D->GetDeviceContext());
 
-	// 컬러 셰이더로 모델을 렌더링.
-	result = m_TextureShader->Render(m_Direct3D->GetDeviceContext(), m_Model->GetIndexCount(), worldMatrix, viewMatrix, projectionMatrix, m_Model->GetTexture());
+	// 조명 셰이더에 행렬, 텍스처, 빛 방향과 색을 전달.
+	result = m_LightShader->Render(m_Direct3D->GetDeviceContext(), m_Model->GetIndexCount(), worldMatrix, viewMatrix, projectionMatrix, m_Model->GetTexture(), m_Light->GetDirection(), m_Light->GetDiffuseColor());
 	if (!result)
 	{
 		return result;

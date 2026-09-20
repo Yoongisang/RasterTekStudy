@@ -1,23 +1,24 @@
-#include "textureshaderclass.h"
+#include "lightshaderclass.h"
 
-TextureShaderClass::TextureShaderClass()
+LightShaderClass::LightShaderClass()
 {
     m_vertexShader = 0;
     m_pixelShader = 0;
     m_layout = 0;
     m_matrixBuffer = 0;
     m_sampleState = 0;
+    m_lightBuffer = 0;
 }
 
-TextureShaderClass::TextureShaderClass(const TextureShaderClass& other)
+LightShaderClass::LightShaderClass(const LightShaderClass& other)
 {
 }
 
-TextureShaderClass::~TextureShaderClass()
+LightShaderClass::~LightShaderClass()
 {
 }
 
-bool TextureShaderClass::Initialize(ID3D11Device* device, HWND hwnd)
+bool LightShaderClass::Initialize(ID3D11Device* device, HWND hwnd)
 {
     bool result;
     wchar_t vsFilename[128];
@@ -25,13 +26,13 @@ bool TextureShaderClass::Initialize(ID3D11Device* device, HWND hwnd)
     int error;
 
     // 정점 셰이더 파일의 이름을 설정.
-    error = wcscpy_s(vsFilename, 128, L"texture.vs");
+    error = wcscpy_s(vsFilename, 128, L"light.vs");
     if(error != 0)
     {
         return false;
     }
 
-    error = wcscpy_s(psFilename, 128, L"texture.ps");
+    error = wcscpy_s(psFilename, 128, L"light.ps");
     if(error != 0)
     {
         return false;
@@ -47,7 +48,7 @@ bool TextureShaderClass::Initialize(ID3D11Device* device, HWND hwnd)
     return true;
 }
 
-void TextureShaderClass::Shutdown()
+void LightShaderClass::Shutdown()
 {
     // 정점·픽셀 셰이더와 관련 객체들을 해제.
     ShutdownShader();
@@ -55,14 +56,14 @@ void TextureShaderClass::Shutdown()
     return;
 }
 
-bool TextureShaderClass::Render(ID3D11DeviceContext* deviceContext, int indexCount, XMMATRIX worldMatrix,
-    XMMATRIX viewMatrix, XMMATRIX projectionMatrix, ID3D11ShaderResourceView* texture)
+bool LightShaderClass::Render(ID3D11DeviceContext* deviceContext, int indexCount, XMMATRIX worldMatrix,
+    XMMATRIX viewMatrix, XMMATRIX projectionMatrix, ID3D11ShaderResourceView* texture, XMFLOAT3 lightDirection, XMFLOAT4 diffuseColor)
 {
     bool result;
 
 
     // 렌더링에 사용할 셰이더 매개변수를 설정한다.
-    result = SetShaderParameters(deviceContext, worldMatrix, viewMatrix, projectionMatrix, texture);
+    result = SetShaderParameters(deviceContext, worldMatrix, viewMatrix, projectionMatrix, texture, lightDirection, diffuseColor);
     if(!result)
     {
         return false;
@@ -74,13 +75,13 @@ bool TextureShaderClass::Render(ID3D11DeviceContext* deviceContext, int indexCou
     return true;
 }
 
-bool TextureShaderClass::InitializeShader(ID3D11Device* device, HWND hwnd, WCHAR* vsFilename, WCHAR* psFilename)
+bool LightShaderClass::InitializeShader(ID3D11Device* device, HWND hwnd, WCHAR* vsFilename, WCHAR* psFilename)
 {
     HRESULT result;
     ID3D10Blob* errorMessage;
     ID3D10Blob* vertexShaderBuffer;
     ID3D10Blob* pixelShaderBuffer;
-    D3D11_INPUT_ELEMENT_DESC polygonLayout[2];
+    D3D11_INPUT_ELEMENT_DESC polygonLayout[3];
     unsigned int numElements;
     D3D11_BUFFER_DESC matrixBufferDesc;
     D3D11_SAMPLER_DESC samplerDesc;
@@ -90,7 +91,7 @@ bool TextureShaderClass::InitializeShader(ID3D11Device* device, HWND hwnd, WCHAR
     vertexShaderBuffer = 0;
     pixelShaderBuffer = 0;
     // 정점 셰이더 코드를 컴파일.
-    result = D3DCompileFromFile(vsFilename, NULL, NULL, "TextureVertexShader", "vs_5_0", D3D10_SHADER_ENABLE_STRICTNESS, 0,
+    result = D3DCompileFromFile(vsFilename, NULL, NULL, "LightVertexShader", "vs_5_0", D3D10_SHADER_ENABLE_STRICTNESS, 0,
                                 &vertexShaderBuffer, &errorMessage);
     if(FAILED(result))
     {
@@ -108,7 +109,7 @@ bool TextureShaderClass::InitializeShader(ID3D11Device* device, HWND hwnd, WCHAR
         return false;
     }
     // 픽셀 셰이더 코드를 컴파일한다.
-    result = D3DCompileFromFile(psFilename, NULL, NULL, "TexturePixelShader", "ps_5_0", D3D10_SHADER_ENABLE_STRICTNESS, 0,
+    result = D3DCompileFromFile(psFilename, NULL, NULL, "LightPixelShader", "ps_5_0", D3D10_SHADER_ENABLE_STRICTNESS, 0,
                                 &pixelShaderBuffer, &errorMessage);
     if(FAILED(result))
     {
@@ -155,6 +156,11 @@ bool TextureShaderClass::InitializeShader(ID3D11Device* device, HWND hwnd, WCHAR
     polygonLayout[1].InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
     polygonLayout[1].InstanceDataStepRate = 0;
 
+    // 위치와 UV 뒤에 있는 법선 데이터를 셰이더의 NORMAL 입력에 연결.
+    polygonLayout[2] = polygonLayout[0];
+    polygonLayout[2].SemanticName = "NORMAL";
+    polygonLayout[2].AlignedByteOffset = D3D11_APPEND_ALIGNED_ELEMENT;
+
     // 레이아웃의 요소 개수.
     numElements = sizeof(polygonLayout) / sizeof(polygonLayout[0]);
 
@@ -186,6 +192,18 @@ bool TextureShaderClass::InitializeShader(ID3D11Device* device, HWND hwnd, WCHAR
         return false;
     }
 
+    // 픽셀 셰이더에 전달할 32바이트 조명 상수 버퍼를 생성.
+    D3D11_BUFFER_DESC lightBufferDesc = {};
+    lightBufferDesc.Usage = D3D11_USAGE_DYNAMIC;
+    lightBufferDesc.ByteWidth = sizeof(LightBufferType);
+    lightBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+    lightBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+    result = device->CreateBuffer(&lightBufferDesc, NULL, &m_lightBuffer);
+    if (FAILED(result))
+    {
+        return false;
+    }
+
     // 텍스처 샘플러 상태 설명 구조체를 생성.
     samplerDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
     samplerDesc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
@@ -211,8 +229,14 @@ bool TextureShaderClass::InitializeShader(ID3D11Device* device, HWND hwnd, WCHAR
     return true;
 }
 
-void TextureShaderClass::ShutdownShader()
+void LightShaderClass::ShutdownShader()
 {
+    if (m_lightBuffer)
+    {
+        m_lightBuffer->Release();
+        m_lightBuffer = 0;
+    }
+
     // 샘플러 상태를 해제.
     if (m_sampleState)
     {
@@ -251,7 +275,7 @@ void TextureShaderClass::ShutdownShader()
     return;
 }
 
-void TextureShaderClass::OutputShaderErrorMessage(ID3D10Blob* errorMessage, HWND hwnd, WCHAR* shaderFilename)
+void LightShaderClass::OutputShaderErrorMessage(ID3D10Blob* errorMessage, HWND hwnd, WCHAR* shaderFilename)
 {
     char* compileErrors;
     unsigned long long bufferSize, i;
@@ -285,8 +309,8 @@ void TextureShaderClass::OutputShaderErrorMessage(ID3D10Blob* errorMessage, HWND
     return;
 }
 
-bool TextureShaderClass::SetShaderParameters(ID3D11DeviceContext* deviceContext, XMMATRIX worldMatrix,
-    XMMATRIX viewMatrix, XMMATRIX projectionMatrix, ID3D11ShaderResourceView* texture)
+bool LightShaderClass::SetShaderParameters(ID3D11DeviceContext* deviceContext, XMMATRIX worldMatrix,
+    XMMATRIX viewMatrix, XMMATRIX projectionMatrix, ID3D11ShaderResourceView* texture, XMFLOAT3 lightDirection, XMFLOAT4 diffuseColor)
 {
     HRESULT result;
     D3D11_MAPPED_SUBRESOURCE mappedResource;
@@ -326,10 +350,23 @@ bool TextureShaderClass::SetShaderParameters(ID3D11DeviceContext* deviceContext,
     // 픽셀 셰이더에 셰이더 텍스처 리소스를 설정.
     deviceContext->PSSetShaderResources(0, 1, &texture);
 
+    // CPU의 빛 색과 진행 방향을 복사하고 픽셀 셰이더 b0에 연결.
+    result = deviceContext->Map(m_lightBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+    if (FAILED(result))
+    {
+        return false;
+    }
+    LightBufferType* lightData = static_cast<LightBufferType*>(mappedResource.pData);
+    lightData->diffuseColor = diffuseColor;
+    lightData->lightDirection = lightDirection;
+    lightData->padding = 0.0f;
+    deviceContext->Unmap(m_lightBuffer, 0);
+    deviceContext->PSSetConstantBuffers(0, 1, &m_lightBuffer);
+
     return true;
 }
 
-void TextureShaderClass::RenderShader(ID3D11DeviceContext* deviceContext, int indexCount)
+void LightShaderClass::RenderShader(ID3D11DeviceContext* deviceContext, int indexCount)
 {
     // 정점 입력 레이아웃을 설정.
     deviceContext->IASetInputLayout(m_layout);

@@ -8,7 +8,7 @@
 using namespace DirectX;
 using namespace std;
 
-class TextureShaderClass
+class LightShaderClass
 {
 private:
     struct MatrixBufferType
@@ -18,21 +18,29 @@ private:
         XMMATRIX projection;
     };
 
+    struct LightBufferType
+    {
+        XMFLOAT4 diffuseColor;
+        XMFLOAT3 lightDirection;
+        float padding;
+    };
+    static_assert(sizeof(LightBufferType) == 32, "LightBuffer must match HLSL packing.");
+
 public:
-    TextureShaderClass();
-    TextureShaderClass(const TextureShaderClass& other);
-    ~TextureShaderClass();
+    LightShaderClass();
+    LightShaderClass(const LightShaderClass& other);
+    ~LightShaderClass();
 
     bool Initialize(ID3D11Device* device, HWND hwnd);
     void Shutdown();
-    bool Render(ID3D11DeviceContext* deviceContext, int indexCount, XMMATRIX worldMatrix, XMMATRIX viewMatrix, XMMATRIX projectionMatrix, ID3D11ShaderResourceView* texture);
+    bool Render(ID3D11DeviceContext* deviceContext, int indexCount, XMMATRIX worldMatrix, XMMATRIX viewMatrix, XMMATRIX projectionMatrix, ID3D11ShaderResourceView* texture, XMFLOAT3 lightDirection, XMFLOAT4 diffuseColor);
 
 private:
     bool InitializeShader(ID3D11Device* device, HWND hwnd, WCHAR* vsFilename, WCHAR* psFilename);
     void ShutdownShader();
     void OutputShaderErrorMessage(ID3D10Blob* errorMessage, HWND hwnd, WCHAR* shaderFilename);
 
-    bool SetShaderParameters(ID3D11DeviceContext* deviceContext, XMMATRIX worldMatrix, XMMATRIX viewMatrix, XMMATRIX projectionMatrix, ID3D11ShaderResourceView* texture);
+    bool SetShaderParameters(ID3D11DeviceContext* deviceContext, XMMATRIX worldMatrix, XMMATRIX viewMatrix, XMMATRIX projectionMatrix, ID3D11ShaderResourceView* texture, XMFLOAT3 lightDirection, XMFLOAT4 diffuseColor);
     void RenderShader(ID3D11DeviceContext* deviceContext, int indexCount);
 
 private:
@@ -40,6 +48,7 @@ private:
     ID3D11PixelShader* m_pixelShader;
     ID3D11InputLayout* m_layout;
     ID3D11Buffer* m_matrixBuffer;
+    ID3D11Buffer* m_lightBuffer;
     ID3D11SamplerState* m_sampleState;
     
 };
