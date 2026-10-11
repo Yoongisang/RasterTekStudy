@@ -19,6 +19,7 @@ ApplicationClass::~ApplicationClass()
 
 bool ApplicationClass::Initialize(int screenWidth, int screenHeight, HWND hwnd)
 {
+	char modelFilename[128];
 	char textureFilename[128];
 	bool result;
 	// Direct3D 객체를 생성하고 초기화
@@ -43,13 +44,14 @@ bool ApplicationClass::Initialize(int screenWidth, int screenHeight, HWND hwnd)
 	}
 
 	// 카메라의 초기 위치를 설정.
-	m_Camera->SetPosition(0.0f, 0.0f, -5.0f);
-
+	m_Camera->SetPosition(0.0f, 0.0f, -10.0f);
+	// 모델 파일 이름을 설정한다.
+	strcpy_s(modelFilename, "cube.txt");
+	strcpy_s(textureFilename, "stone01.tga");
 	// 모델 객체를 생성하고 초기화.
 	m_Model = new ModelClass;
-	strcpy_s(textureFilename, "stone01.tga");
 
-	result = m_Model->Initialize(m_Direct3D->GetDevice(), m_Direct3D->GetDeviceContext(), textureFilename);
+	result = m_Model->Initialize(m_Direct3D->GetDevice(), m_Direct3D->GetDeviceContext(), modelFilename, textureFilename);
 	if(!result)
 	{
 		MessageBox(hwnd, L"Could not initialize the model object.", L"Error", MB_OK);
@@ -118,10 +120,10 @@ bool ApplicationClass::Frame()
 	bool result;
 	// 그래픽 장면 렌더링
 	static float rotation = 0.0f;
-	rotation += 0.01f;
-	if (rotation >= XM_2PI)
+	rotation -= 0.0174532925f * 0.25f;
+	if(rotation < 0.0f)
 	{
-		rotation -= XM_2PI;
+		rotation += 360.0f;
 	}
 	result = Render(rotation);
 
@@ -130,7 +132,7 @@ bool ApplicationClass::Frame()
 
 bool ApplicationClass::Render(float rotation)
 {
-	XMMATRIX worldMatrix, viewMatrix, projectionMatrix;
+	XMMATRIX worldMatrix, viewMatrix, projectionMatrix, rotateMatrix, translateMatrix, scaleMatrix, srMatrix;
 	bool result;
 	
 	// 장면을 시작하기 위해 버퍼를 지움
@@ -143,7 +145,30 @@ bool ApplicationClass::Render(float rotation)
 	m_Direct3D->GetWorldMatrix(worldMatrix);
 	m_Camera->GetViewMatrix(viewMatrix);
 	m_Direct3D->GetProjectionMatrix(projectionMatrix);
-	worldMatrix = XMMatrixRotationY(rotation);
+
+	// 큐브1 : 회전 -> 왼쪽 2만큼 이동
+	rotateMatrix = XMMatrixRotationY(rotation);
+	translateMatrix = XMMatrixTranslation(-2.0f, 0.0f, 0.0f);
+	worldMatrix = XMMatrixMultiply(rotateMatrix,translateMatrix);
+
+	// 그리기를 준비하기 위해 모델의 정점·인덱스 버퍼를 그래픽 파이프라인에 올림.
+	m_Model->Render(m_Direct3D->GetDeviceContext());
+
+	// 조명 셰이더에 행렬, 텍스처, 빛 방향과 색을 전달.
+	result = m_LightShader->Render(m_Direct3D->GetDeviceContext(), m_Model->GetIndexCount(), worldMatrix, viewMatrix, projectionMatrix, m_Model->GetTexture(), m_Light->GetDirection(), m_Light->GetDiffuseColor());
+	if (!result)
+	{
+		return result;
+	}
+
+	// 큐브 2: 0.5배 축소 -> 회전 -> 오른쪽 2만큼 이동
+	scaleMatrix     = XMMatrixScaling(0.5f, 0.5f, 0.5f);
+	rotateMatrix    = XMMatrixRotationY(rotation);
+	translateMatrix = XMMatrixTranslation(2.0f, 0.0f, 0.0f);
+
+	srMatrix    = XMMatrixMultiply(scaleMatrix, rotateMatrix);
+	worldMatrix = XMMatrixMultiply(srMatrix, translateMatrix);
+
 
 	// 그리기를 준비하기 위해 모델의 정점·인덱스 버퍼를 그래픽 파이프라인에 올림.
 	m_Model->Render(m_Direct3D->GetDeviceContext());

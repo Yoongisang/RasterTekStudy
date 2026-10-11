@@ -173,6 +173,9 @@
     </None>
   </ItemGroup>
   <ItemGroup>
+    <Content Include="cube.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Content Include="light.ps">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>

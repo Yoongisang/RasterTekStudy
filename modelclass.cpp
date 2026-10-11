@@ -5,6 +5,7 @@ ModelClass::ModelClass()
     m_vertexBuffer = 0;
     m_indexBuffer = 0;
     m_Texture = 0;
+    m_model = 0;
 }
 
 ModelClass::ModelClass(const ModelClass& other)
@@ -15,10 +16,17 @@ ModelClass::~ModelClass()
 {
 }
 
-bool ModelClass::Initialize(ID3D11Device* device, ID3D11DeviceContext* deviceContext, char* textureFilename)
+bool ModelClass::Initialize(ID3D11Device* device, ID3D11DeviceContext* deviceContext,char* modelFilename, char* textureFilename)
 {
     bool result;
-    
+
+    // 모델 데이터를 읽어 들임.
+    result = LoadModel(modelFilename);
+    if (!result)
+    {
+        return false;
+    }
+
     // 정점 인덱스 버퍼를 초기화
     result = InitializeBuffers(device);
     if (!result)
@@ -49,6 +57,9 @@ void ModelClass::Shutdown()
 
     // 정점 인덱스 버퍼를 종료
     ShutdownBuffers();
+
+    // model data를 해제한다.
+    ReleaseModel();
 }
 
 void ModelClass::Render(ID3D11DeviceContext* deviceContext)
@@ -69,6 +80,70 @@ ID3D11ShaderResourceView* ModelClass::GetTexture()
     return m_Texture->GetTexture();
 }
 
+bool ModelClass::LoadModel(char* filename)
+{
+    ifstream fin;
+    char input;
+    int i;
+
+
+    // 모델 파일 오픈.
+    fin.open(filename);
+
+    // 파일을 열 수 없으면 종료.
+    if(fin.fail())
+    {
+        return false;
+    }
+
+    // 정점 수 값이 나올 때까지 읽음.
+    fin.get(input);
+    while (input != ':')
+    {
+        fin.get(input);
+    }
+
+    // 정점 수를 읽어 들임.
+    fin >> m_vertexCount;
+
+    // 인덱스 수를 정점 수와 같게 설정.
+    m_indexCount = m_vertexCount;
+
+    // 읽어 들인 정점 수만큼 모델 배열을 생성.
+    m_model = new ModelType[m_vertexCount];
+
+    // 데이터 시작 지점까지 읽음.
+    fin.get(input);
+    while (input != ':')
+    {
+        fin.get(input);
+    }
+    fin.get(input);
+    fin.get(input);
+
+    // 정점 데이터를 읽어 들임.
+    for(i=0; i<m_vertexCount; i++)
+    {
+        fin >> m_model[i].x >> m_model[i].y >> m_model[i].z;
+        fin >> m_model[i].tu >> m_model[i].tv;
+        fin >> m_model[i].nx >> m_model[i].ny >> m_model[i].nz;
+    }
+
+    // 모델 파일을 닫음.
+    fin.close();
+
+    return true;
+}
+
+void ModelClass::ReleaseModel()
+{
+    if(m_model)
+    {
+        delete [] m_model;
+        m_model = 0;
+    }
+}
+
 bool ModelClass::InitializeBuffers(ID3D11Device* device)
 {
     VertexType* vertices;
@@ -76,41 +151,20 @@ bool ModelClass::InitializeBuffers(ID3D11Device* device)
     D3D11_BUFFER_DESC vertexBufferDesc, indexBufferDesc;
     D3D11_SUBRESOURCE_DATA vertexData, indexData;
     HRESULT result;
-
-    // 정점 배열의 정점 개수를 설정
-    m_vertexCount = 3;
-    // 인덱스 배열의 인덱스 개수를 설정
-    m_indexCount = 3;
+    int i;
     // 정점 배열을 생성
     vertices = new VertexType[m_vertexCount];
-    if (!vertices)
-    {
-        return false;
-    }
     // 인덱스 배열을 생성
     indices = new unsigned long[m_indexCount];
-    if (!indices)
+    // 정점 배열과 인덱스 배열에 데이터를 채움.
+    for(i=0; i<m_vertexCount; i++)
     {
-        return false;
+        vertices[i].position = XMFLOAT3(m_model[i].x, m_model[i].y, m_model[i].z);
+        vertices[i].texture = XMFLOAT2(m_model[i].tu, m_model[i].tv);
+        vertices[i].normal = XMFLOAT3(m_model[i].nx, m_model[i].ny, m_model[i].nz);
+
+        indices[i] = i;
     }
-
-    // 정점 배열에 데이터를 채움
-    vertices[0].position = XMFLOAT3(-1.0f, -1.0f, 0.0f);  // 왼쪽 아래
-    vertices[0].texture = XMFLOAT2(0.0f, 1.0f);
-    vertices[0].normal = XMFLOAT3(0.0f, 0.0f, -1.0f);
-
-    vertices[1].position = XMFLOAT3(0.0f, 1.0f, 0.0f);  // 위쪽 가운데
-    vertices[1].texture = XMFLOAT2(0.5f, 0.0f);
-    vertices[1].normal = XMFLOAT3(0.0f, 0.0f, -1.0f);
-
-    vertices[2].position = XMFLOAT3(1.0f, -1.0f, 0.0f);  // 오른쪽 아래
-    vertices[2].texture = XMFLOAT2(1.0f, 1.0f);
-    vertices[2].normal = XMFLOAT3(0.0f, 0.0f, -1.0f);
-
-    // 인덱스 배열에 데이터를 채움
-    indices[0] = 0;  // 왼쪽 아래
-    indices[1] = 1;  // 위쪽 가운데
-    indices[2] = 2;  // 오른쪽 아래
 
     // 정적 정점 버퍼의 description을 설정합니다.
     vertexBufferDesc.Usage = D3D11_USAGE_DEFAULT;
@@ -169,7 +223,7 @@ bool ModelClass::LoadTexture(ID3D11Device* device, ID3D11DeviceContext* deviceCo
     // 텍스처 객체를 생성하고 초기화한다.
     m_Texture = new TextureClass;
 
-    result = m_Texture->Initialize(device, deviceContext, textureFilename);
+    result = m_Texture->Initialize(device, deviceContext,textureFilename);
     if (!result)
     {
         return false;
