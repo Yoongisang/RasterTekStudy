@@ -3,6 +3,7 @@ SamplerState SampleType : register(s0);
 
 cbuffer LightBuffer : register(b0)
 {
+    float4 ambientColor;
     float4 diffuseColor;
     float3 lightDirection;
     float padding;
@@ -17,14 +18,28 @@ struct PixelInputType
 
 float4 LightPixelShader(PixelInputType input) : SV_TARGET
 {
-    float4 textureColor = shaderTexture.Sample(SampleType, input.tex);
+    float4 textureColor;
+    float3 lightDir;
+    float lightIntensity;
+    float4 color;
 
-    // 정점 사이에서 보간된 법선을 다시 정규화하면 더 안전하다.
-    float3 normal = normalize(input.normal);
-    float3 lightDir = -lightDirection;
+    textureColor = shaderTexture.Sample(SampleType, input.tex);
 
-    float lightIntensity = saturate(dot(normal, lightDir));
-    float4 color = saturate(diffuseColor * lightIntensity);
+    // 앰비언트
+    color = ambientColor;
 
-    return color * textureColor;
+    lightDir = -lightDirection;
+    lightIntensity = saturate(dot(input.normal, lightDir));
+    
+    // 빛을 받는 면에만 디퓨즈를 더함
+    if(lightIntensity > 0.0f)
+    {
+        color += (diffuseColor * lightIntensity);
+    }
+
+    // ambient + diffuse가 1을 넘을 수 있으므로 클램프
+    color = saturate(color);
+
+    color = color * textureColor;
+    return color;
 }
