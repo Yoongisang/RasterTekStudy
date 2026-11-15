@@ -1,12 +1,12 @@
+#define NUM_LIGHTS 4
+
 Texture2D shaderTexture : register(t0);
 SamplerState SampleType : register(s0);
 
-cbuffer LightBuffer : register(b0)
+// 점광원 4개의 색 (PS b0)
+cbuffer LightColorBuffer
 {
-    float4 ambientColor;
-    float4 diffuseColor;
-    float3 lightDirection;
-    float padding;
+    float4 diffuseColor[NUM_LIGHTS];
 };
 
 struct PixelInputType
@@ -14,32 +14,37 @@ struct PixelInputType
     float4 position : SV_POSITION;
     float2 tex      : TEXCOORD0;
     float3 normal   : NORMAL;
+    float3 lightPos[NUM_LIGHTS] : TEXCOORD1;
 };
 
 float4 LightPixelShader(PixelInputType input) : SV_TARGET
 {
     float4 textureColor;
-    float3 lightDir;
-    float lightIntensity;
+    float  lightIntensity[NUM_LIGHTS];
+    float4 colorArray[NUM_LIGHTS];
+    float4 colorSum;
     float4 color;
+    int i;
 
     textureColor = shaderTexture.Sample(SampleType, input.tex);
 
-    // 앰비언트
-    color = ambientColor;
-
-    lightDir = -lightDirection;
-    lightIntensity = saturate(dot(input.normal, lightDir));
-    
-    // 빛을 받는 면에만 디퓨즈를 더함
-    if(lightIntensity > 0.0f)
+    // 광원마다 N·L로 세기 계산 -> 색 곱하기
+    for(i = 0; i < NUM_LIGHTS; i++)
     {
-        color += (diffuseColor * lightIntensity);
+        lightIntensity[i] = saturate(dot(input.normal, input.lightPos[i]));
+        colorArray[i] = diffuseColor[i] * lightIntensity[i];
     }
 
-    // ambient + diffuse가 1을 넘을 수 있으므로 클램프
-    color = saturate(color);
+    // 모든 광원 색을 합산
+    colorSum = float4(0.0f, 0.0f, 0.0f, 1.0f);
+    for(i = 0; i < NUM_LIGHTS; i++)
+    {
+        colorSum.r += colorArray[i].r;
+        colorSum.g += colorArray[i].g;
+        colorSum.b += colorArray[i].b;
+    }
 
-    color = color * textureColor;
+    // 합산된 빛 x 텍스처
+    color = saturate(colorSum) * textureColor;
     return color;
 }

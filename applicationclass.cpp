@@ -6,7 +6,7 @@ ApplicationClass::ApplicationClass()
 	m_Camera = 0;
 	m_Model = 0;
 	m_LightShader = 0;
-	m_Light = 0;
+	m_Lights = 0;
 }
 
 ApplicationClass::ApplicationClass(const ApplicationClass& other)
@@ -44,9 +44,9 @@ bool ApplicationClass::Initialize(int screenWidth, int screenHeight, HWND hwnd)
 	}
 
 	// 카메라의 초기 위치를 설정.
-	m_Camera->SetPosition(0.0f, 0.0f, -10.0f);
+	m_Camera->SetPosition(0.0f, 2.0f, -12.0f);
 	// 모델 파일 이름을 설정한다.
-	strcpy_s(modelFilename, "cube.txt");
+	strcpy_s(modelFilename, "plane.txt");
 	strcpy_s(textureFilename, "stone01.tga");
 	// 모델 객체를 생성하고 초기화.
 	m_Model = new ModelClass;
@@ -67,19 +67,31 @@ bool ApplicationClass::Initialize(int screenWidth, int screenHeight, HWND hwnd)
 		return false;
 	}
 	
-	m_Light = new LightClass;
-	m_Light->SetAmbientColor(0.15f, 0.15f, 0.15f, 1.0f);
-	m_Light->SetDiffuseColor(1.0f, 1.0f, 1.0f, 1.0f);
-	m_Light->SetDirection(1.0f, 0.0f, 0.0f);
+	m_numLights = 4;
+	m_Lights = new LightClass[m_numLights];
+
+	// 평면 네 모서리 위에 배치
+	m_Lights[0].SetDiffuseColor(1.0f, 0.0f, 0.0f, 1.0f); // 빨강
+	m_Lights[0].SetPosition(-3.0f, 1.0f, 3.0f);
+
+	m_Lights[1].SetDiffuseColor(0.0f, 1.0f, 0.0f, 1.0f); // 초록
+	m_Lights[1].SetPosition(3.0f, 1.0f, 3.0f);
+
+	m_Lights[2].SetDiffuseColor(0.0f, 0.0f, 1.0f, 1.0f); // 파랑
+	m_Lights[2].SetPosition(-3.0f, 1.0f, -3.0f);
+
+	m_Lights[3].SetDiffuseColor(1.0f, 1.0f, 1.0f, 1.0f); // 흰색
+	m_Lights[3].SetPosition(3.0f, 1.0f, -3.0f);
+
 	return true;
 }
 
 void ApplicationClass::Shutdown()
 {
-	if (m_Light)
+	if (m_Lights)
 	{
-		delete m_Light;
-		m_Light = 0;
+		delete [] m_Lights;
+		m_Lights = 0;
 	}
 
 	// 조명 셰이더 객체를 해제.
@@ -133,7 +145,9 @@ bool ApplicationClass::Frame()
 
 bool ApplicationClass::Render(float rotation)
 {
-	XMMATRIX worldMatrix, viewMatrix, projectionMatrix, rotateMatrix, translateMatrix, scaleMatrix, srMatrix;
+	XMMATRIX worldMatrix, viewMatrix, projectionMatrix;
+	XMFLOAT4 diffuseColor[NUM_LIGHTS], lightPosition[NUM_LIGHTS];
+	int i;
 	bool result;
 	
 	// 장면을 시작하기 위해 버퍼를 지움
@@ -147,35 +161,18 @@ bool ApplicationClass::Render(float rotation)
 	m_Camera->GetViewMatrix(viewMatrix);
 	m_Direct3D->GetProjectionMatrix(projectionMatrix);
 
-	// 큐브1 : 회전 -> 왼쪽 2만큼 이동
-	rotateMatrix = XMMatrixRotationY(rotation);
-	translateMatrix = XMMatrixTranslation(-2.0f, 0.0f, 0.0f);
-	worldMatrix = XMMatrixMultiply(rotateMatrix,translateMatrix);
-
-	// 그리기를 준비하기 위해 모델의 정점·인덱스 버퍼를 그래픽 파이프라인에 올림.
-	m_Model->Render(m_Direct3D->GetDeviceContext());
-
-	// 조명 셰이더에 행렬, 텍스처, 빛 방향과 색을 전달.
-	result = m_LightShader->Render(m_Direct3D->GetDeviceContext(), m_Model->GetIndexCount(), worldMatrix, viewMatrix, projectionMatrix, m_Model->GetTexture(), m_Light->GetDirection(), m_Light->GetAmbientColor(), m_Light->GetDiffuseColor());
-	if (!result)
+	// 광원 객체들 -> 색/위치 배열로 모으기
+	for(i = 0; i < m_numLights; i++)
 	{
-		return result;
+		diffuseColor[i]  = m_Lights[i].GetDiffuseColor();
+		lightPosition[i] = m_Lights[i].GetPosition();
 	}
 
-	// 큐브 2: 0.5배 축소 -> 회전 -> 오른쪽 2만큼 이동
-	scaleMatrix     = XMMatrixScaling(0.5f, 0.5f, 0.5f);
-	rotateMatrix    = XMMatrixRotationY(rotation);
-	translateMatrix = XMMatrixTranslation(2.0f, 0.0f, 0.0f);
-
-	srMatrix    = XMMatrixMultiply(scaleMatrix, rotateMatrix);
-	worldMatrix = XMMatrixMultiply(srMatrix, translateMatrix);
-
-
 	// 그리기를 준비하기 위해 모델의 정점·인덱스 버퍼를 그래픽 파이프라인에 올림.
 	m_Model->Render(m_Direct3D->GetDeviceContext());
 
 	// 조명 셰이더에 행렬, 텍스처, 빛 방향과 색을 전달.
-	result = m_LightShader->Render(m_Direct3D->GetDeviceContext(), m_Model->GetIndexCount(), worldMatrix, viewMatrix, projectionMatrix, m_Model->GetTexture(), m_Light->GetDirection(), m_Light->GetAmbientColor(), m_Light->GetDiffuseColor());
+	result = m_LightShader->Render(m_Direct3D->GetDeviceContext(), m_Model->GetIndexCount(), worldMatrix, viewMatrix, projectionMatrix, m_Model->GetTexture(), diffuseColor, lightPosition);
 	if (!result)
 	{
 		return result;
